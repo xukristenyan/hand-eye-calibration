@@ -1,0 +1,24 @@
+[project]
+name = "hand-eye-calibration"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "xukristenyan", email = "xkyan3@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
+]
+
+[tool.uv.sources]
+kortex-api = { git = "ssh://git@github.com/kaolab-research/patched-kinova-kortex-api" }
+
+
+[project.scripts]
+hand-eye-calibration = "hand_eye_calibration:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
