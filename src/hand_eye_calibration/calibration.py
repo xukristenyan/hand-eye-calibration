@@ -5,6 +5,8 @@ from datetime import datetime
 import numpy as np
 from pathlib import Path
 from .utils import generate_random_poses, detect_marker_in_image, get_marker_detector, estimate_marker_pose, euler_to_rot
+from itertools import combinations
+from tabulate import tabulate
 
 
 class HandEyeCalibrator:
@@ -55,28 +57,59 @@ class HandEyeCalibrator:
     def calibrate(self, marker_length=0.07, num_samples=15, filter=True):
         T_marker_gripper = self.get_T_marker_gripper()
 
-        raw_robot_poses, raw_marker_poses = self.collect_marker_and_robot_poses(marker_length, num_samples)
-
-        # filter out invalid samples
-        if filter:
-            robot_poses, marker_poses = raw_robot_poses, raw_marker_poses
-
-        else:
-            robot_poses, marker_poses = raw_robot_poses, raw_marker_poses
-
+        robot_poses, marker_poses = self.collect_marker_and_robot_poses(marker_length, num_samples)
         T_base_cam = self.get_rigid_transform(marker_poses, robot_poses, T_marker_gripper)
-
         mean_error, std_error = self.validate_calibration(T_base_cam, marker_poses, robot_poses, T_marker_gripper)
 
-        
-        print(f"\n--- Calibration Validation ---")
-        print(f"Mean Reprojection Error: {mean_error * 1000:.2f} mm")
-        print(f"Standard Deviation:      {std_error * 1000:.2f} mm")
-        print(f"----------------------------\n")
+        headers = ["Mean Error", "Std Error", "Samples Used"]
+        table_data = [[f"{mean_error * 1000:.2f}", f"{std_error * 1000:.2f}", 'all']] 
+
+        if filter:
+            print("\nRefining calibration by filtering out bad poses...")
+            
+            best_T_base_cam, best_mean_error, best_std_error, best_samples_indices = self.find_the_best_calibration(marker_poses, robot_poses, T_marker_gripper)
+            if best_mean_error < mean_error:
+                T_base_cam = best_T_base_cam
+
+            table_data.append([f"{best_mean_error * 1000:.2f}", f"{best_std_error * 1000:.2f}", ', '.join([str(idx) for idx in best_samples_indices])])
+
+        print(tabulate(table_data, headers, tablefmt="fancy_grid"))
+
+        np.save(self.save_dir / f"T_{self.camera.serial}.npy", T_base_cam)
 
         return T_base_cam
 
 
+    def find_the_best_calibration(self, marker_poses, robot_poses, T_marker_gripper, num_keep):
+        num_samples = len(robot_poses)
+        all_indices = list(range(num_samples))
+        num_keep = num_samples - 2
+
+        best_mean_error, best_std_error = 1000, 1000
+        best_T_base_cam = None
+        best_samples_indices = None
+    
+        for i in list(range(num_keep)):
+            print(f"Processing subsets of size {i}...")
+
+            for combo in combinations(all_indices, i):
+                subset_indices = list(combo)
+
+                subset_robot_poses = [robot_poses[idx] for idx in subset_indices]
+                subset_marker_poses = [marker_poses[idx] for idx in subset_indices]
+
+                T_base_cam_subset = self.get_rigid_transform(subset_marker_poses, subset_robot_poses, T_marker_gripper)
+                mean_error_subset, std_error_subset = self.validate_calibration(T_base_cam_subset, subset_marker_poses, subset_robot_poses, T_marker_gripper)
+
+                if mean_error_subset < best_mean_error:
+                    best_mean_error = mean_error_subset
+                    best_std_error = std_error_subset
+                    best_T_base_cam = T_base_cam_subset
+                    best_samples_indices = subset_indices
+        
+        return best_T_base_cam, best_mean_error, best_std_error, best_samples_indices
+
+            
     def get_T_marker_camera(self, rvec, tvec):
         R_ct, _ = cv2.Rodrigues(rvec)
 

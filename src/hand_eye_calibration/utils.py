@@ -91,3 +91,11 @@ def euler_to_rot(roll, pitch, yaw) -> np.ndarray:
                 [0, 0, 1]])
 
     return Rz @ Ry @ Rx
+
+
+
+
+def quit_keypress():
+    key = cv2.waitKey(1)
+    # Press ESC
+    return key == 27
