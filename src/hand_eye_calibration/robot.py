@@ -2,34 +2,25 @@
 kinova.py
 
 An implementation of the Robot class with the Kinova robotic arm.
-hi matthew and ali please work on this
-hi matthew
 """
-
-# run from ~/Projects/emg-gaze/
-# uv run python -m src.environment.kinova
-
-# home coords xyz below approx. (0.5, 0, 0.43)
-# KinovaState(data=array([ 5.7614034e-01, -1.5542102e-02,  4.2999908e-01,  9.0551262e+01, 1.0861688e+00,  8.7556015e+01], dtype=float32), gripper=0.5, device=device(type='cpu'))
 
 import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import override
-import sys
 import time
 import threading
 from roboenv import Robot
 
-
 from kortex_api.TCPTransport import TCPTransport
-from kortex_api.RouterClient import RouterClient
+from kortex_api.RouterClient import RouterClient, RouterClientSendOptions
 from kortex_api.SessionManager import SessionManager
 
-from kortex_api.autogen.client_stubs.VisionConfigClientRpc import VisionConfigClient
 from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
 from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
-from kortex_api.autogen.messages import Session_pb2, Base_pb2, VisionConfig_pb2, DeviceConfig_pb2
+from kortex_api.autogen.client_stubs.VisionConfigClientRpc import VisionConfigClient
 from kortex_api.autogen.client_stubs.DeviceManagerClientRpc import DeviceManagerClient
+
+from kortex_api.autogen.messages import Session_pb2, Base_pb2, VisionConfig_pb2, DeviceConfig_pb2
 from kortex_api.Exceptions.KException import KException
 
 class Kinova(Robot):
@@ -53,20 +44,21 @@ class Kinova(Robot):
         """
         
         super().__init__(fps)
-        self.id: int = id
-        self.ip: str = "192.168.1.10"
-        self.state = KinovaState([0.6, 0, 0.45, 179, 0, 0], 0.5)
-        self.bounds = [(0.05, 1.00), (-0.60, 0.65), (0.02, 0.60)]
+        self.id= id
+        self.ip = "192.168.1.10"
+        self.state = None
+        self.bounds: list[tuple[float, float]] = [(0.15, 0.75), (-0.60, 0.42), (0.02, 0.40)]
+        """operating area bounds in (x,y,z)"""
+        self.height: float = 0.30
+        """default navigation height (m)"""
         
-
-
         self.connected = False
         self.busy = False
         # self.nb_dof = 0
         self.action = Base_pb2.Action()
 
-        # self.gripper_command = Base_pb2.GripperCommand()
-        # self.gripper_command.mode = Base_pb2.GRIPPER_POSITION
+        self.gripper_command = Base_pb2.GripperCommand()
+        self.gripper_command.mode = Base_pb2.GRIPPER_POSITION
         self.gripper_request = Base_pb2.GripperRequest()
         self.gripper_request.mode = Base_pb2.GRIPPER_POSITION
 
@@ -74,8 +66,8 @@ class Kinova(Robot):
         self.e = None
 
         self.error_callback = lambda kException: print("_________ callback error _________ {}".format(kException))
-        self.tcp_client = None
-        self.router_client = None
+        self.transport = None
+        self.router = None
         self.session_manager = None
         self.device_config_client = None
         self.base = None
@@ -97,16 +89,15 @@ class Kinova(Robot):
         """
         
         TCP_PORT = 10000
-        UDP_PORT = 10001
+        # UDP_PORT = 10001
 
         if self.connected:
             self.shutdown()
 
         try:
-            self.tcp_client = TCPTransport()
-            self.router_client = RouterClient(self.tcp_client, self.error_callback)
-            # self.router_client = RouterClient(self.transport, RouterClient.basicErrorCallback)
-            self.tcp_client.connect(self.ip, TCP_PORT)
+            self.transport = TCPTransport()
+            self.router = RouterClient(self.transport, self.error_callback)
+            self.transport.connect(self.ip, TCP_PORT)
 
             session_info = Session_pb2.CreateSessionInfo()
             session_info.username = "admin"
@@ -114,15 +105,15 @@ class Kinova(Robot):
             session_info.session_inactivity_timeout = 60000  # milliseconds
             session_info.connection_inactivity_timeout = 2000  # milliseconds
 
-            self.session_manager = SessionManager(self.router_client)
+            self.session_manager = SessionManager(self.router)
             self.session_manager.CreateSession(session_info)
 
             print("Session created")
 
-            self.base = BaseClient(self.router_client)
-            self.base_cyclic = BaseCyclicClient(self.router_client)
-            # self.device_config_client = DeviceConfigClient(self.router_client)
-            # self.control_config_client = BaseClient(self.router_client)
+            self.base = BaseClient(self.router)
+            self.base_cyclic = BaseCyclicClient(self.router)
+            # self.device_config_client = DeviceConfigClient(self.router)
+            # self.control_config_client = BaseClient(self.router)
 
             # self.nb_dof = self.base.GetActuatorCount().count
 
@@ -132,12 +123,8 @@ class Kinova(Robot):
 
             self.connected = True
 
-            # print(f"hello I am robot id {self.id}")
-            # return True
-
         except KException as ex:
             self.on_error(ex)
-            # return False
 
     @override
     def shutdown(self) -> None:
@@ -149,30 +136,31 @@ class Kinova(Robot):
         
         # if self.session_manager != None:
         if self.connected:
-            self.session_manager.CloseSession()
-            self.router_client.SetActivationStatus(False)
-            self.tcp_client.disconnect()
-            # # Implementation in example code:
-            # router_options = RouterClientSendOptions()
-            # router_options.timeout_ms = 1000
             # self.session_manager.CloseSession()
-            # self.tcp_client.disconnect()
+            # self.router.SetActivationStatus(False)
+            # self.transport.disconnect()
+            # # Implementation in example code:
+            router_options = RouterClientSendOptions()
+            router_options.timeout_ms = 1000
+            self.session_manager.CloseSession(router_options)
+            self.transport.disconnect()
 
         self.connected = False
         self.base = None
         # self.device_config_client = None
         # self.control_config_client = None
         self.session_manager = None
-        self.router_client = None
-        self.tcp_client = None
+        self.router = None
+        self.transport = None
 
-        # print(f"bye bye from robot {self.id}")
 
     @override
-    def get_current_state(self, joints=False) -> KinovaState:
+    def get_current_state(self, joints=False):
         """
         Query the robot's current state.
 
+        Args:
+            joints (bool): if True, return joint angles instead of end-effector pose
         Returns:
             KinovaState: current state (end-effector pose & gripper position)
         """
@@ -196,25 +184,24 @@ class Kinova(Robot):
         if joints:
             q = [feedback.actuators[i].position for i in range(7)]  # radians
             return q
-        
+
+        self.state = KinovaState(proprio, gripper)
         return KinovaState(proprio, gripper)
 
     @override
-    def execute_action(self, action: KinovaAction) -> None:
+    def execute_action(self, action) -> None:
         """
         Execute a control action on the robot.
 
         Twist command specifies velocities; m/s and deg/s for our purposes.
 
         Args:
-            action (Action): The action (twist command & gripper position) to send.
+            action (KinovaAction): The action (twist command & gripper position) to send.
         """
 
-        # print(action.gripper)
         if action.gripper > 1.0 or action.gripper < 0.0:
             print("invalid gripper command")
             return
-        
         
         command = Base_pb2.TwistCommand()
 
@@ -222,27 +209,40 @@ class Kinova(Robot):
         command.duration = 0  # duration constraint
         twist = command.twist
 
-        # bound the movement in allowed area
-        if not self.in_bounds():
-            print("Predicted position out of bounds, stopping action")
-            self.base.Stop()
-            twist.linear_x = 0
-            twist.linear_y = 0
-            twist.linear_z = 0
-            twist.angular_x = 0
-            twist.angular_y = 0
-            twist.angular_z = 0
-            self.base.SendTwistCommand(command)
-            sys.exit(1)
-        else:
-            twist.linear_x = action.data[0]  # should be m/s
-            twist.linear_y = action.data[1]
-            twist.linear_z = action.data[2]
-            twist.angular_x = action.data[3]  # should be deg/s
-            twist.angular_y = action.data[4]
-            twist.angular_z = action.data[5]
+        dt = 1.0 / float(self.fps if getattr(self, "fps", 0) else 10.0)
+        eps = 0.001 # small tolerance
+        (xmin, xmax), (ymin, ymax), (zmin, zmax) = self.bounds
 
-        self.base.SendTwistCommand(command)
+        def limit_axis(pos, vel, lo, hi):
+            next_pos = pos + vel * dt
+
+            # If we're inside, block steps that would leave the box this tick
+            if lo + eps <= pos <= hi - eps:
+                if next_pos < lo or next_pos > hi:
+                    return 0.0
+                return vel
+
+            # If we're at/beyond a boundary, only allow velocity pointing back in
+            if pos <= lo + eps:
+                print("[SAFETY] boundary reached")
+                return max(0.0, vel) 
+            if pos >= hi - eps:
+                print("[SAFETY] boundary reached")
+                return min(0.0, vel)  
+            return vel
+        
+        x, y, z = self.get_current_state().data[:3]
+        vx, vy, vz = action.data[:3]
+        vx = limit_axis(x, vx, xmin, xmax)
+        vy = limit_axis(y, vy, ymin, ymax)
+        vz = limit_axis(z, vz, zmin, zmax)
+
+        twist.linear_x = vx
+        twist.linear_y = vy
+        twist.linear_z = vz
+        twist.angular_x = action.data[3]  # should be deg/s
+        twist.angular_y = action.data[4]
+        twist.angular_z = action.data[5]
 
         # # I think twist should be updated continuously as-is, but in case time is needed to execute the command:
         # time.sleep(self.TWIST_TIME)
@@ -257,23 +257,29 @@ class Kinova(Robot):
         gripper_command.mode = Base_pb2.GRIPPER_POSITION
         finger.finger_identifier = 1
         finger.value = action.gripper
-        # print("Gripper going to position {:0.2f}...".format(finger.value))
-        self.base.SendGripperCommand(gripper_command)
-        # time.sleep(1)
 
-        # print(f"action executed! I am robot {self.id}")
+        e = threading.Event()
+        notification_handle = self.base.OnNotificationActionTopic(
+            self.check_for_end_or_abort(e), Base_pb2.NotificationOptions()
+        )
+        self.notification_handles.append(notification_handle)
+
+        self.base.SendTwistCommand(command)
+        self.base.SendGripperCommand(gripper_command)
+        e.wait(20) 
+        self.base.Unsubscribe(notification_handle)
 
     @override
-    def go_to_waypoint(self, waypoint: Waypoint) -> None:
+    def go_to_waypoint(self, waypoint) -> None:
         """
         Command the robot to move to a specific Cartesian waypoint.
         
         Does not change end-effector orientation (theta_x, theta_y, theta_z).
 
         Args:
-            waypoint (Any): The target waypoint (x, y, z).
+            waypoint (Waypoint): The target waypoint (x, y, z).
         """
-        # print(f"going to waypoint! {self.id}")
+
         self.action.Clear()
         self.action = Base_pb2.Action()
         self.action.name = "go_to_waypoint"
@@ -282,7 +288,7 @@ class Kinova(Robot):
         feedback = self.base_cyclic.RefreshFeedback()
         pose = self.action.reach_pose.target_pose
 
-        # check if the robot is in bounds, else ends the program
+        # check if the robot is in bounds
         if not self.in_bounds(waypoint):
             pose.x = feedback.base.tool_pose_x
             pose.y = feedback.base.tool_pose_y
@@ -292,14 +298,12 @@ class Kinova(Robot):
             pose.theta_z = feedback.base.tool_pose_theta_z
             print("Waypoint is out of bounds, keeping current position")
         else:
-            pose.x = float(waypoint[0])
-            pose.y = float(waypoint[1])
-            pose.z = float(waypoint[2])
+            pose.x = float(waypoint.data[0])
+            pose.y = float(waypoint.data[1])
+            pose.z = float(waypoint.data[2])
             pose.theta_x = feedback.base.tool_pose_theta_x
             pose.theta_y = feedback.base.tool_pose_theta_y
             pose.theta_z = feedback.base.tool_pose_theta_z
-        # OPTIONAL: orientation (pose. theta_x, theta_y, theta_z)
-        # NB not sure if pose.theta_xyz need to have values
 
         e = threading.Event()
         notification_handle = self.base.OnNotificationActionTopic(
@@ -308,27 +312,38 @@ class Kinova(Robot):
         self.notification_handles.append(notification_handle)
 
         self.base.ExecuteAction(self.action)
-
-        finished = e.wait(20)  # wait for up to 20 seconds or until action is completed
+        e.wait(20)  # wait for up to 20 seconds or until action is completed
         self.base.Unsubscribe(notification_handle)
 
-        # if finished:
-        #     print(f"arrived at waypoint! {self.id}")
 
     # Note: Waypoint is defined in ../agent/aria.py
-    # first in_bounds is for velocity controlled movement (e.g. TwistCommand())
-    def in_bounds(self, waypoint: Waypoint = None) -> bool:
+    def in_bounds(self, waypoint = None, action = None) -> bool:
         """
-        Returns True if the robot is within the operation area.
-        If `waypoint` is provided, check that instead of the current state.
+        Returns True if the robot is (or will remain) within the operation area.
+
+        Args:
+            waypoint (Waypoint, optional): If provided, check this pose instead of current state.
+            action (KinovaAction, optional): If provided, predict the next pose by applying
+                                            the action's velocity for one control step (dt=1/fps).
         """
         (xmin, xmax), (ymin, ymax), (zmin, zmax) = self.bounds
+
+        # --- base pose to evaluate ---
         if waypoint is not None:
-            x, y, z = waypoint.data
+            x, y, z = waypoint.data[:3]
         else:
             x, y, z = self.get_current_state().data[:3]
+
+        # --- project forward if action is given ---
+        if action is not None:
+            dt = 1.0 / float(self.fps if getattr(self, "fps", 0) else 10.0)
+            vx, vy, vz = action.data[:3]  # linear velocities in m/s
+            x += vx * dt
+            y += vy * dt
+            z += vz * dt
+
         return xmin <= x <= xmax and ymin <= y <= ymax and zmin <= z <= zmax
-    
+
     @staticmethod
     def check_for_end_or_abort(e):
         """
@@ -344,13 +359,17 @@ class Kinova(Robot):
         """
 
         def check(notification, e=e):
-            print("EVENT : " + Base_pb2.ActionEvent.Name(notification.action_event))
+            # print("EVENT : " + Base_pb2.ActionEvent.Name(notification.action_event))
             if notification.action_event == Base_pb2.ACTION_END or notification.action_event == Base_pb2.ACTION_ABORT:
                 e.set()
 
         return check
 
-    def execute_seq(self):
+    def execute_seq(self) -> None:
+        """
+        Execute a predefined sequence.
+        Uses predefined "test seq" sequence in Kinova.
+        """
     
         e = threading.Event()
         notification_handle = self.base.OnNotificationActionTopic(
@@ -370,15 +389,27 @@ class Kinova(Robot):
         finished = e.wait(10)
         self.base.Unsubscribe(notification_handle)
 
-        if finished:
-            print("Home position reached")
-        else:
-            print("Could not reach position in time (10 seconds right now)")
 
-    def go_home(self):
+    def go_home(self) -> None:
         """
         Go to designated home waypoint.
+        Uses predefined "home_sept" action in Kinova.
         """
+
+        action_type = Base_pb2.RequestedActionType()
+        action_type.action_type = Base_pb2.REACH_JOINT_ANGLES
+        action_list = self.base.ReadAllActions(action_type)
+        action_handle = None
+        for action in action_list.action_list:
+            if action.name == "home_sept":
+                action_handle = action.handle
+        
+        gripper_command = Base_pb2.GripperCommand()
+        finger = gripper_command.gripper.finger.add()
+
+        gripper_command.mode = Base_pb2.GRIPPER_POSITION
+        finger.finger_identifier = 1
+        finger.value = 0.0
 
         e = threading.Event()
         notification_handle = self.base.OnNotificationActionTopic(
@@ -386,24 +417,8 @@ class Kinova(Robot):
         )
         self.notification_handles.append(notification_handle)
 
-        action_type = Base_pb2.RequestedActionType()
-        action_type.action_type = Base_pb2.REACH_JOINT_ANGLES
-        action_list = self.base.ReadAllActions(action_type)
-        action_handle = None
-        for action in action_list.action_list:
-            if action.name == "HOME":
-                action_handle = action.handle
-        
-        self.base.ExecuteActionFromReference(action_handle)
-
-        gripper_command = Base_pb2.GripperCommand()
-        finger = gripper_command.gripper.finger.add()
-
-        gripper_command.mode = Base_pb2.GRIPPER_POSITION
-        finger.finger_identifier = 1
-        finger.value = 0.0
-        # print("Gripper going to position {:0.2f}...".format(finger.value))
         self.base.SendGripperCommand(gripper_command)
+        self.base.ExecuteActionFromReference(action_handle)
 
         finished = e.wait(10)
         self.base.Unsubscribe(notification_handle)
@@ -413,12 +428,11 @@ class Kinova(Robot):
         else:
             print("Could not reach position in time (10 seconds right now)")
         
-
     def get_eye_intrinsics(self):
         """
         Fetch intrinsics and extrinsics.
         """
-        device_manager = DeviceManagerClient(self.router_client)
+        device_manager = DeviceManagerClient(self.router)
         device_handles = device_manager.ReadAllDevices()
         vision_device_ids = [
             handle.device_identifier for handle in device_handles.device_handle
@@ -427,7 +441,7 @@ class Kinova(Robot):
         assert len(vision_device_ids) == 1, "only 1 vision device is expected"
         vision_device_id = vision_device_ids[0]
 
-        vision = VisionConfigClient(self.router_client)
+        vision = VisionConfigClient(self.router)
 
         sensor_id = VisionConfig_pb2.SensorIdentifier()
         sensor_id.sensor = VisionConfig_pb2.SENSOR_COLOR
@@ -447,16 +461,21 @@ class Kinova(Robot):
 
         return intrinsics
 
+    # try not to use this function because joint control has a different inverse kinematic solver than cartesian control
+    def move_to_joint_angles(self, q: list, action_name: str) -> None:
+        """
+        Helper to send a reach_joint_angles action in joint space, wait for it, and clean up.
+        Args:
+            q (list): target joint angles (radians)
+            action_name (str): name of the action (for logging)
+        """
 
-    def move_to_joint_angles(self, action_name, q):
-        
         action = Base_pb2.Action()
         action.name = action_name
         action.application_data = ""
 
         actuator_count = self.base.GetActuatorCount()
 
-        # Place arm straight up
         for joint_id in range(actuator_count.count):
             joint_angle = action.reach_joint_angles.joint_angles.joint_angles.add()
             joint_angle.joint_identifier = joint_id
@@ -477,12 +496,14 @@ class Kinova(Robot):
             print("Joints movement completed")
         else:
             print("Timeout on action notification wait")
-        return finished
 
-
-    def _execute_reach(self, waypoint, action_name, theta_x=None, theta_y=None, theta_z=None):
+    def reach_pose(self, robot_state, action_name: str) -> None:
         """
-        Helper to send a reach_pose action, wait for it, and clean up.
+        Helper to send a reach_pose action in Cartesian coordinates (x,y,z,pitch,roll,yaw), wait for it, and clean up.
+        
+        Args:
+            robot_state (KinovaState): target pose and gripper position
+            action_name (str): name of the action (for logging)
         """
         # build action
         action = Base_pb2.Action()
@@ -491,46 +512,54 @@ class Kinova(Robot):
         # action.change_twist.angular = 35.0   # add 70°/s to whatever the current cap is
 
         # get current orientation for X/Y fallback
-        fb = self.base_cyclic.RefreshFeedback()
         pose = action.reach_pose.target_pose
+        arm = robot_state
+        # gripper = robot_state.gripper
+        waypoint = Waypoint(data=[robot_state.data[0], robot_state.data[1], self.height])
 
-        # TODO: @Matthew to add the adjusted bound
-        pose.x = float(waypoint[0])
-        pose.y = float(waypoint[1])
-        pose.z = float(waypoint[2])
-        pose.theta_x = theta_x if theta_x is not None else fb.base.tool_pose_theta_x
-        pose.theta_y = theta_y if theta_y is not None else fb.base.tool_pose_theta_y
-        pose.theta_z = theta_z if theta_z is not None else fb.base.tool_pose_theta_z
+        pose.x = float(arm[0])
+        pose.y = float(arm[1])
+        pose.z = float(arm[2])
+        pose.theta_x = float(arm[3])
+        pose.theta_y = float(arm[4])
+        pose.theta_z = float(arm[5])
 
         # subscribe & execute
-        done = threading.Event()
+        e = threading.Event()
         handle = self.base.OnNotificationActionTopic(
-            self.check_for_end_or_abort(done),
+            self.check_for_end_or_abort(e),
             Base_pb2.NotificationOptions()
         )
+        # self.go_to_waypoint(waypoint) # first go to above the target to avoid collisions
         self.base.ExecuteAction(action)
 
-        finished = done.wait(20)
+        finished = e.wait(20)
         if finished:
-            print(f"[{action_name}] completed at {waypoint} with θx={theta_x}°, θy={theta_y}°, θz={theta_z}°")
+            print(f"[{action_name}] completed at {arm}")
+            print("movement complete!")
         else:
             print(f"[{action_name}] timed out.")
         self.base.Unsubscribe(handle)
-        
+
         return finished
 
-
-    def pick_bowl(self, target_xyz, z_angle=0.01):
+    def pick_bowl(self, waypoint, z_angle: float = 0.01) -> None:
         """
         1. move down to pick height (6cm) at the given theta_z
         2. close gripper and wait until it actually grabs
         3. raise up to 25cm
+        Args:
+            waypoint (Waypoint): target (x,y) position to pick bowl from
+            z_angle (float): end-effector yaw (theta_z) angle (degrees) to use when picking
         """
-        self.pick_bowl_joint_angles = self.get_current_state(joints=True)
+        init_cartesian_pose = self.get_current_state()
 
         # --- go down to pick ---
-        pick_wp = [target_xyz[0], target_xyz[1], 0.06]
-        finished = self._execute_reach(pick_wp, "pick_bowl", theta_z=z_angle)
+        pick_wp = np.array([waypoint.data[0], waypoint.data[1], 0.06,
+        179.9, init_cartesian_pose.data[4], z_angle], dtype=np.float32)
+
+        pick_state = KinovaState(data=pick_wp, gripper=0)
+        finished = self.reach_pose(pick_state, "pick_bowl")
 
         # --- close gripper ---
         if not finished:
@@ -560,27 +589,23 @@ class Kinova(Robot):
         if abs(meas.finger[0].value) < 0.93:
             finger.value = 0.95
             self.base.SendGripperCommand(gripper_cmd)
-            print("here")
+
+        self.pick_bowl_pose = self.get_current_state()
 
         # --- lift up ---
-        lift_wp = [target_xyz[0], target_xyz[1], 0.25]
-        finished = self._execute_reach(lift_wp, "raise_bowl")
+        finished = self.reach_pose(init_cartesian_pose, "raise_bowl")
 
         return finished
 
-    def place_bowl(self, target_xyz):
+    def place_bowl(self) -> None:
         """
         1. move down to place height (6.4cm)
         2. open gripper and wait until it actually releases
         3. raise up to 25cm at the given theta_z
         """
         
-        # --- go down to place ---
-        place_wp = [target_xyz[0], target_xyz[1], 0.20]
-        finished = self._execute_reach(place_wp, "place_bowl0")
-
-        place_wp = [target_xyz[0], target_xyz[1], 0.064]
-        finished = self._execute_reach(place_wp, "place_bowl1")
+        init_cartesian_pose = self.get_current_state()
+        finished = self.reach_pose(self.pick_bowl_pose, "place_bowl")
 
         # --- open gripper ---
         if not finished:
@@ -605,24 +630,25 @@ class Kinova(Robot):
             time.sleep(0.1)
 
         # --- lift up ---
-        # lift_wp = [target_xyz[0], target_xyz[1], 0.25]
-        
-        # self._execute_reach(lift_wp, "recover_bowl", theta_z=90)
+        self.reach_pose(init_cartesian_pose, "recover_from_place")
 
-        # init_joint_pose = self.get_current_state(joints=True)
-        # init_joint_pose[6] = 92.94
-        self.move_to_joint_angles("recover_bowl", self.pick_bowl_joint_angles)
-
-
-    def pick_spatula(self, target_xyz, z_angle):
+    def pick_spatula(self, waypoint, z_angle: float) -> None:
         """
         1. move down to pick height (3.5cm) at the given theta_z
         2. close gripper and wait until it actually grabs
         3. raise up to 25cm
+        Args:
+            waypoint (Waypoint): target (x,y) position to pick spatula from
+            z_angle (float): end-effector yaw (theta_z) angle (degrees) to use when picking
         """
         # --- go down to pick ---
-        pick_wp = [target_xyz[0], target_xyz[1], 0.035]
-        finished = self._execute_reach(pick_wp, "pick_spatula", theta_z=z_angle)
+        init_cartesian_pose = self.get_current_state()
+
+        pick_data = np.array([waypoint.data[0], waypoint.data[1], 0.035,
+        init_cartesian_pose.data[3], init_cartesian_pose.data[4], z_angle], dtype=np.float32)
+        pick_state = KinovaState(data=pick_data, gripper=0)
+
+        finished = self.reach_pose(pick_state, "pick_spatula")
 
         # --- close gripper ---
         if not finished:
@@ -646,22 +672,20 @@ class Kinova(Robot):
                 break
             time.sleep(0.1)
 
+        self.pick_spatula_pose = self.get_current_state()
+
         # --- lift up ---
-        lift_wp = [target_xyz[0], target_xyz[1], 0.25]
-        self._execute_reach(lift_wp, "raise_spatula")
+        self.reach_pose(init_cartesian_pose, "raise_spatula")
 
-
-    def place_spatula(self, target_xyz):
+    def place_spatula(self) -> None:
         """
         1. move down to place height (5cm)
         2. open gripper and wait until it actually releases
         3. raise up to 25cm at the given theta_z
         """
         # --- go down to place ---
-        place_wp = [target_xyz[0], target_xyz[1], 0.20]
-        finished = self._execute_reach(place_wp, "place_spatula0")
-        place_wp = [target_xyz[0], target_xyz[1], 0.05]
-        finished = self._execute_reach(place_wp, "place_spatula1")
+        init_cartesian_pose = self.get_current_state()
+        finished = self.reach_pose(self.pick_spatula_pose, "place_spatula")
 
         # --- open gripper ---
         if not finished:
@@ -686,62 +710,55 @@ class Kinova(Robot):
             time.sleep(0.1)
 
         # --- lift up ---
-        lift_wp = [target_xyz[0], target_xyz[1], 0.25]
-        self._execute_reach(lift_wp, "recover_spatula", theta_z=88.3)
+        self.reach_pose(init_cartesian_pose, "recover_spatula")
 
+    def pour(self, waypoint) -> None:
+        """
+        1. move above pour location
+        2. rotate end-effector to pour down
+        3. rotate back to recover
+        4. move back to initial position
+        Args:
+            waypoint (Waypoint): target (x,y) position to pour into
+        """
+        init_cartesian_pose = self.get_current_state()
 
-    def pour(self, target_xyz):
-        init_joint_pose = self.get_current_state(joints=True)
+        data: NDArray = np.array([waypoint.data[0], waypoint.data[1], 0.40, 102.4, -89, 79.6])
+        gripper: float = init_cartesian_pose.gripper
+        pose: KinovaState = KinovaState(data, gripper)
 
-        pour_coord = [target_xyz[0], target_xyz[1], 0.40]
+        self.reach_pose(pose, "pour_down")
+        self.reach_pose(init_cartesian_pose, "recover_pour")
 
-        self._execute_reach(pour_coord, "pour_down", theta_x=102.4, theta_y=-89, theta_z=79.6)
-        self.move_to_joint_angles("recover_pour", init_joint_pose)
+    def stir(self, waypoint) -> None:
+        """ 
+        Args:
+            waypoint (Waypoint): target (x,y) position to stir at
+        """
+        init_cartesian_pose = self.get_current_state()
+        twist_coordinates = KinovaState(data=np.array([waypoint.data[0], waypoint.data[1], 0.35, 
+                                                       140, init_cartesian_pose.data[4], init_cartesian_pose.data[5]]), 
+                                                       gripper=init_cartesian_pose.gripper)
+        self.reach_pose(twist_coordinates,"going above stir location")
 
-
-    def stir(self, target_xyz):
-        init_pose = self.get_current_state().data
-        init_coords = init_pose[:3]
-        init_theta_x = init_pose[3]
-        init_theta_y = init_pose[4]
-        init_theta_z = init_pose[5]
-        
-        twist_coordinates = [target_xyz[0], target_xyz[1], 0.35]
-        self._execute_reach(twist_coordinates,"adjusting pose", theta_x=140)
         #square shaped stirring
         y_correction = -0.04
         x_offset = 0.08
         y_offset = -0.08
         z_level = 0.17
-        point1_coordinates = [target_xyz[0], target_xyz[1] + y_correction, z_level]
-        point2_coordinates = [target_xyz[0] + x_offset, target_xyz[1] + y_correction, z_level]
-        point3_coordinates = [target_xyz[0] + x_offset, target_xyz[1] + y_correction + y_offset, z_level]
-        point4_coordinates = [target_xyz[0], target_xyz[1] + y_correction + y_offset, z_level]
+        point1_wp = Waypoint(data=np.array([waypoint.data[0], waypoint.data[1] + y_correction, z_level]))
+        point2_wp = Waypoint(data=np.array([waypoint.data[0] + x_offset, waypoint.data[1] + y_correction, z_level]))
+        point3_wp = Waypoint(data=np.array([waypoint.data[0] + x_offset, waypoint.data[1] + y_correction + y_offset, z_level]))
+        point4_wp = Waypoint(data=np.array([waypoint.data[0], waypoint.data[1] + y_correction + y_offset, z_level]))
+        stirring_wp = [point1_wp, point2_wp, point3_wp, point4_wp]
 
         for i in range(3):
-            for coordinate in [point1_coordinates, point2_coordinates, point3_coordinates, point4_coordinates, point1_coordinates]:
-                self._execute_reach(coordinate, f"going to point {coordinate}")
-        self._execute_reach([init_coords[0], init_coords[1], 0.30], "moving up")
-        self._execute_reach(init_coords, "returning to initial pose", theta_x=179, theta_y=init_theta_y, theta_z=init_theta_z)
+            for coordinate in stirring_wp:
+                self.go_to_waypoint(coordinate)
+                print(f"going to {coordinate}")
 
+        self.reach_pose(init_cartesian_pose, "returning to pose before stirring")
 
-if __name__ == "__main__":
-    robot = Kinova(10, 1)
-    robot.launch()
-    if robot.connected:
-        print("Connection successful")
-    print(robot.get_current_state())
-
-    # wp1 = Waypoint([0.7, 0.3, 0.46])
-    # robot.go_to_waypoint(wp1)
-    # wp2 = Waypoint([0.6, 0, 0.45])
-    #robot.go_to_waypoint(wp2)
-    # a1 = KinovaAction(data=[-0.1, -0.3, -0.01, 0, 0, 0], gripper=0.7)
-    # robot.execute_action(a1)
-    # # a2 = KinovaAction(data=[0.1, 0.3, 0.01, 0, 0, 0], gripper=1.0)
-    # # robot.execute_action(a2)
-    print(robot.get_current_state())  # [0.7, 0.3, 0.46,0,0,0] 1
-    robot.shutdown()
 
 
 from dataclasses import dataclass
@@ -751,7 +768,6 @@ from numpy.typing import NDArray
 import torch
 
 from roboenv import Action
-from .myo_calibrate import PADDLE_POSES, FIST_POSES
 
 
 @dataclass
@@ -775,26 +791,6 @@ class KinovaAction(Action):
     @override
     def torch(self) -> torch.Tensor:
         return torch.from_numpy(self.numpy).to(self.device)
-
-
-@dataclass
-class AriaSignal(Action):
-    """
-    A dataclass representing gaze signal from the Aria glasses.
-    """
-
-    # 2D or 3D gaze signal, up to Xu
-    gaze_signal: NDArray[np.float32]
-
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        return self.gaze_signal
-
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        raise ValueError("Why are you calling me?")
 
 
 @dataclass
@@ -825,62 +821,14 @@ class Waypoint(Action):
         return f"Waypoint({self.data[0]:.2f}, {self.data[1]:.2f}, {self.data[2]:.2f})"
 
 
-@dataclass
-class MyoSignal(Action):
-    """
-    A dataclass representing signals from the Myoband.
-    Question: should this be raw signals or SVM-classfied classes?
-        -> if raw signal, then should SVM classification be handled by Myoband class?
-        -> or should the SVM classification by handled completely outside of the classes in this file?
-    """
-
-    paddle: int
-    fist: int
-    warn: str = ""
-
-    def __post_init__(self) -> None:
-        self.paddle = int(self.paddle)
-        self.fist = int(self.fist)
-
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        return np.array([self.paddle, self.fist])
-
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        return torch.tensor([self.paddle, self.fist])
-
-    def __repr__(self) -> str:
-        if not self:
-            paddle_pos = "NONE"
-            fist_pos = "NONE"
-        else:
-            paddle_pos = PADDLE_POSES[self.paddle]
-            fist_pos = FIST_POSES[self.fist]
-
-        ret = f"\rPaddle: {paddle_pos:<7} | Fist:     {fist_pos:<7}"
-        if len(self.warn) > 0:
-            ret += f" | {self.warn:<100}"
-        return ret
-
-    def __bool__(self):
-        return self.paddle != -1 and self.fist != -1  # if value is -1 something is wrong
-
-
 
 from dataclasses import dataclass
-from PIL import Image
 from typing_extensions import override
 from numpy.typing import NDArray
 import torch
-from torchvision.transforms import ToTensor
 import numpy as np
-from .data.image_utils import resnet18_transforms
 
 from roboenv import State
-from pyrealsense2.pyrealsense2 import composite_frame
 
 
 @dataclass
@@ -910,111 +858,3 @@ class KinovaState(State):
     def torch(self) -> torch.Tensor:
         return torch.from_numpy(self.numpy).to(device=self.device, dtype=torch.float32)
 
-
-@dataclass
-class KinovaImage(State):
-    """
-    A dataclass representing images from the kinova arm camera.
-    """
-
-    data: NDArray[np.uint8]  # [720, 1280, 3], integers in range [0, 255]
-
-    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    @property
-    def pil(self) -> Image.Image:
-        return Image.fromarray(self.data)
-
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        return resnet18_transforms(self.pil).numpy()
-
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        """
-        Return images as [3, 224, 224], float32 in range [0, 1],
-        as processed by Resnet18.
-        """
-        return resnet18_transforms(self.pil).to(self.device)
-
-
-@dataclass
-class RealSenseImage(State):
-    """
-    A dataclass representing camera states of the realsense cameras.
-    """
-
-    # put things here, probably some images and some metadata (e.g. timestamps).
-    image: NDArray
-    frame: composite_frame
-
-    @property
-    def pil(self) -> Image.Image:
-        return Image.fromarray(self.image)
-    
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        return self.image
-
-    @property
-    def pp_numpy(self) -> NDArray:
-        return resnet18_transforms(self.pil).numpy()
-    
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        return torch.from_numpy(self.image)
-
-    @property
-    def pp_torch(self):
-        return resnet18_transforms(self.pil).to(self.device)
-    
-@dataclass
-class RealSenseState(State):
-    """
-    A dataclass representing camera states of the realsense cameras.
-    """
-
-    # put things here, probably some images and some metadata (e.g. timestamps).
-    _color_image: NDArray
-    _depth_image: NDArray
-    _color_frame: composite_frame
-    _depth_frame: composite_frame
-
-    def __post_init__(self):
-        self.color = RealSenseImage(self._color_image, self._color_frame)
-        self.depth = RealSenseImage(self._depth_image, self._depth_frame)
-
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        pass
-
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        pass
-
-
-@dataclass
-class Observation(State):
-    """
-    This is the highest-level wrapper for states. This is what HotPotEnv.step() returns.
-    """
-
-    state: KinovaState
-    eye_image: KinovaImage
-    cam_image: RealSenseImage
-
-    @property
-    @override
-    def numpy(self) -> NDArray:
-        return np.array([])
-
-    @property
-    @override
-    def torch(self) -> torch.Tensor:
-        return torch.tensor([])
