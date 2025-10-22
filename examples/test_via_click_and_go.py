@@ -94,8 +94,8 @@ def main():
         # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_110500/T_346522075401.npy")       # 180
         # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_114301/T_346522075401.npy")     # rotated, 90
         # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/relatively_good/T_346522075401.npy")
-        # transform = np.load('/home/necl/Projects/hand-eye-calibration/data/bTc.npy')
-        transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy")     # no filter, 150 trials (really bad lol)
+        transform = np.load('/home/necl/Projects/hand-eye-calibration/data/bTc.npy')
+        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy")     # no filter, 150 trials (really bad lol)
 
         wp_generator = WaypointGenerator(transform)
 
@@ -108,7 +108,7 @@ def main():
         waypoint = wp_generator.get_waypoint(pixel_3d)
         print(f"waypoint = {waypoint}")
 
-        # robot.go_to_waypoint(waypoint)
+        robot.go_to_waypoint(waypoint)
 
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Exiting gracefully.")

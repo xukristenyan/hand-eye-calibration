@@ -25,6 +25,15 @@ class HandEyeCalibrator:
             os.makedirs(self.image_dir, exist_ok=True)
 
 
+        self.test_set = {   # outdated
+                (274, 250): [0.357, 0.003],
+                (391, 220): [0.575, 0.079],
+                (288, 376): [0.397, -0.207],
+                (167, 309): [0.21, -0.10],
+                # (389, 247): [0.587, -0.037],
+                # (368, 316): [0.528, -0.124],
+            }
+
 # ==================================================================
 # TODO: update with your robot's and camera's API
     def move_robot_to_pose(self, pose):
@@ -73,6 +82,8 @@ class HandEyeCalibrator:
         T_marker_gripper[:3, 3] = translation
         
         return T_marker_gripper
+    
+
 # ==================================================================
 
     def calibrate(self, marker_length=0.07, num_samples=15, filter=True):
@@ -83,7 +94,7 @@ class HandEyeCalibrator:
         mean_error, std_error = self.validate_calibration(T_base_cam, marker_poses, robot_poses, T_marker_gripper)
 
         headers = ["Mean Error", "Std Error", "Samples Used"]
-        table_data = [[f"{mean_error * 1000:.2f}", f"{std_error * 1000:.2f}", 'all']] 
+        table_data = [[f"{mean_error * 100:.2f}", f"{std_error * 100:.2f}", 'all']] 
 
         print(f" Total valid poses collected: {len(robot_poses)}")
         if filter:
@@ -93,10 +104,10 @@ class HandEyeCalibrator:
             if best_mean_error < mean_error:
                 T_base_cam = best_T_base_cam
 
-            table_data.append([f"{best_mean_error * 1000:.2f}", f"{best_std_error * 1000:.2f}", ', '.join([str(idx) for idx in best_samples_indices])])
+            table_data.append([f"{best_mean_error * 100:.2f}", f"{best_std_error * 100:.2f}", ', '.join([str(idx) for idx in best_samples_indices])])
 
         print(tabulate(table_data, headers, tablefmt="fancy_grid"))
-        print("Unit: mm")
+        print("Unit: cm")
 
         np.save(self.save_dir / f"T_{self.camera.serial}.npy", T_base_cam)
 

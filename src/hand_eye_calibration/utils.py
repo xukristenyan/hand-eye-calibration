@@ -47,7 +47,7 @@ def get_marker_detector():
     return detector
 
 
-def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
+def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):       # new w/o using cv2 func
     # define 3D marker corners in marker frame
     obj_points = np.array([
         [-marker_length / 2,  marker_length / 2, 0],
@@ -71,7 +71,7 @@ def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
     return rvec, tvec.squeeze()
 
 
-# def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
+# def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):         # old cv2 func
 #     rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, marker_length, camera_matrix, dist_coeffs)
 
 #     return rvecs[0], tvecs[0]
