@@ -4,14 +4,12 @@ from realsense_toolbox import PointCloudGenerator
 from hand_eye_calibration.robot import Kinova
 import traceback
 import numpy as np
-
 from dataclasses import dataclass
 import numpy as np
 from typing_extensions import override
 from numpy.typing import NDArray
 import torch
-from typing import Callable
-
+from hand_eye_calibration.utils.io import load_npy
 
 class WaypointGenerator:
     def __init__(self, T):
@@ -24,8 +22,6 @@ class WaypointGenerator:
         # waypoint = Waypoint(data = target)
         waypoint = Waypoint(data = p_base[:3])
         return waypoint
-
-
 
 @dataclass
 class Waypoint():
@@ -53,11 +49,40 @@ class Waypoint():
         return f"Waypoint({self.data[0]:.2f}, {self.data[1]:.2f}, {self.data[2]:.2f})"
 
 
+def convert_a_pixel_to_waypoint(camera, depth_frame, pixel, wp_generator):
+    pixel_3d = camera.deproject_pixel_to_point(pixel, depth_frame)
+    waypoint = wp_generator.get_waypoint(pixel_3d)
+
+    return waypoint
+
+def tune_transform(transform, x=None, y=None, z=None):   # x, y, z are offsets in meters
+    # tune the transform according to the specified offsets
+    x = 0 if x is None else x
+    y = 0 if y is None else y
+    z = 0 if z is None else z
+    transform[0,3] += x
+    transform[1,3] += y
+    transform[2,3] += z
+
+    return transform
 
 def main():
     # ===== YOUR CHANGES =====
     serial = "346522075401"
-# 234222302792
+    # serial = "234222302792"
+
+    # /home/necl/Projects/hand-eye-calibration/data/20251020_114301/T_346522075401.npy     # rotated, 90
+    # /home/necl/Projects/hand-eye-calibration/data/relatively_good/T_346522075401.npy
+    # /home/necl/Projects/hand-eye-calibration/data/bTc.npy
+    # /home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy     # no filter, 150 trials (really bad lol)
+    # /home/necl/Projects/hand-eye-calibration/data/transform_tests/T_346522075401.npy
+
+    file_name = ""
+    transform = load_npy(file_name)
+    transform = tune_transform(transform, x=None, y=0.025, z=None)
+
+    # ========================
+
 
     # see readme for full configurations.
     specs = {
@@ -65,18 +90,6 @@ def main():
             "color_auto_exposure": False,
             "depth_auto_exposure": False,
         }
-
-    pcd_config = {
-        "enable_depth_filter": True,
-        "min_depth": 0.1,
-        "max_depth": 2.0,
-        "enable_prune": True,
-        "bbox_min": [-0.8, -0.3, 0.01],     # x, y, z min ranges
-        "bbox_max": [0.8, 0.5, 1.8],        # x, y, z max ranges
-        "enable_downsample": False,
-        "voxel_size": 0.01                  # unit: meter
-    }
-    # ========================
     camera = None
     try:
         camera = RealSenseCamera(serial, specs)
@@ -87,29 +100,27 @@ def main():
         if robot.connected:
             print("Connection successful")
 
-        pixel_selector = PixelSelector()
+        robot.go_home()
 
-        # transform = np.load('/home/necl/Projects/hand-eye-calibration/data/20251020_093915/T_346522075401.npy')     # 90
-        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_110015/T_346522075401.npy")     # 0
-        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_110500/T_346522075401.npy")       # 180
-        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_114301/T_346522075401.npy")     # rotated, 90
-        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/relatively_good/T_346522075401.npy")
-        transform = np.load('/home/necl/Projects/hand-eye-calibration/data/bTc.npy')
-        # transform = np.load("/home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy")     # no filter, 150 trials (really bad lol)
+        pixel_selector = PixelSelector()
 
         wp_generator = WaypointGenerator(transform)
 
         color_image, _, _, depth_frame = camera.get_current_state()
 
         pixels = pixel_selector.run(color_image)
-        pixel_3d = camera.deproject_pixel_to_point(pixels[0], depth_frame)
-        print(f"{pixel_3d = }")
-
-        waypoint = wp_generator.get_waypoint(pixel_3d)
-        print(f"waypoint = {waypoint}")
+        waypoint = convert_a_pixel_to_waypoint(camera, depth_frame, pixels[0], wp_generator)
 
         robot.go_to_waypoint(waypoint)
 
+        # save updated transform
+        res = input('save the change?')
+        if res == 'y' or res == 'Y':
+            np.save(file_name, transform)
+            print('SAVED')
+        else:
+            print('Transform UNCHANGED')
+    
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Exiting gracefully.")
 

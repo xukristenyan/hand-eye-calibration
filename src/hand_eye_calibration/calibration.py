@@ -7,6 +7,7 @@ from pathlib import Path
 from .utils import generate_random_poses, detect_marker_in_image, get_marker_detector, estimate_marker_pose, euler_to_rot
 from itertools import combinations
 from tabulate import tabulate
+from .pixel_selection import PixelSelector
 
 
 class HandEyeCalibrator:
@@ -82,7 +83,10 @@ class HandEyeCalibrator:
         T_marker_gripper[:3, 3] = translation
         
         return T_marker_gripper
-    
+
+
+    def reset_robot_to_home(self):
+        self.robot.go_home()
 
 # ==================================================================
 
