@@ -15,11 +15,12 @@ def generate_random_poses(start_pose, num_samples=15):
     for i in range(num_samples):
         target_pos = reference_pos + position_offsets[i]
 
-        raw_euler = reference_euler + euler_offsets[i]
-        target_quat = R.from_euler('xyz', raw_euler).as_quat()
-        if target_quat[3] < 0:
-            np.negative(target_quat, out=target_quat)
-        target_euler = R.from_quat(target_quat).as_euler('xyz')
+        # raw_euler = reference_euler + euler_offsets[i]
+        # target_quat = R.from_euler('xyz', raw_euler).as_quat()
+        # if target_quat[3] < 0:
+        #     np.negative(target_quat, out=target_quat)
+        # target_euler = R.from_quat(target_quat).as_euler('xyz')
+        target_euler = reference_euler + euler_offsets[i]
 
         poses.append(np.concatenate((target_pos, target_euler)))
 
@@ -31,6 +32,7 @@ def detect_marker_in_image(image, detector):
     _, thresholded = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     corners, ids, _ = detector.detectMarkers(thresholded)
 
+    cv2.aruco.drawDetectedMarkers(image, corners, ids)
     if ids is not None:
         return image, corners, ids
     else:
@@ -45,7 +47,7 @@ def get_marker_detector():
     return detector
 
 
-def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
+def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):       # new w/o using cv2 func
     # define 3D marker corners in marker frame
     obj_points = np.array([
         [-marker_length / 2,  marker_length / 2, 0],
@@ -66,12 +68,12 @@ def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
     if not success:
         raise RuntimeError("solvePnP failed")
 
-    return rvec, tvec.squeeze()     # TODO: check squeeze() is correct or not
+    return rvec, tvec.squeeze()
 
 
-# def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):
+# def estimate_marker_pose(corners, marker_length, camera_matrix, dist_coeffs):         # old cv2 func
 #     rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, marker_length, camera_matrix, dist_coeffs)
-#
+
 #     return rvecs[0], tvecs[0]
 
 
