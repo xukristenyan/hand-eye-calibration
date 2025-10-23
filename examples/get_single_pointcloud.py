@@ -6,7 +6,7 @@ import numpy as np
 def main():
     # ===== YOUR CHANGES =====
     serial = "244622072715"  # side
-    serial = "346522075401"  # main
+    # serial = "346522075401"  # main
 
 
     # see readme for full configurations.
@@ -28,16 +28,16 @@ def main():
     }
 
 
-    pcd_config = {  # main
-        "enable_depth_filter": True,
-        "min_depth": 0.1,
-        "max_depth": 2.3,
-        "enable_prune": True,
-        "bbox_min": [-0.7, -0.4, 0.01],     # x, y, z min ranges
-        "bbox_max": [0.5, 0.5, 1.8],        # x, y, z max ranges
-        "enable_downsample": True,
-        "voxel_size": 0.01                  # unit: meter
-    }
+    # pcd_config = {  # main
+    #     "enable_depth_filter": True,
+    #     "min_depth": 0.1,
+    #     "max_depth": 2.3,
+    #     "enable_prune": True,
+    #     "bbox_min": [-0.7, -0.4, 0.01],     # x, y, z min ranges
+    #     "bbox_max": [0.5, 0.5, 1.8],        # x, y, z max ranges
+    #     "enable_downsample": True,
+    #     "voxel_size": 0.01                  # unit: meter
+    # }
 
     # ========================
 

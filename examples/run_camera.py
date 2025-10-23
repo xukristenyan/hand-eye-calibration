@@ -7,8 +7,9 @@ from src.hand_eye_calibration.config import serial, camera_config
 def main():
 
     # ===== YOUR CHANGES =====
-    serial = "346522075401"
-    # serial = "244622072715"
+    # serial = "346522075401"
+    serial = "244622072715"
+    # serial = "234222302792"
 
     camera_config = {
         "enable_viewer": True,

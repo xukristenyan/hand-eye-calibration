@@ -11,8 +11,8 @@ def main():
 
     # # ===== YOUR CHANGES =====
     # serial = "244622072715"  # side
-    serial = "346522075401"  # main
-
+    # serial = "346522075401"  # main
+    serial = "234222302792"
 
     # see readme for full configurations.
     specs = {
@@ -38,8 +38,8 @@ def main():
         left = cv2.cvtColor(left, cv2.COLOR_GRAY2RGB)
         right = cv2.cvtColor(right, cv2.COLOR_GRAY2RGB)
 
-        cv2.imwrite("ir_left_main.png", left)
-        cv2.imwrite("ir_right_main.png", right)
+        cv2.imwrite("ir_left_large.png", left)
+        cv2.imwrite("ir_right_large.png", right)
 
         baseline = camera.get_baseline()
         intrinsic = camera.get_intrinsics()

@@ -56,17 +56,17 @@ def main():
             if color_image is not None and depth_image is not None:
                 break
 
-        pcd = pc_generator.get_pointcloud(color_image, color_frame, depth_frame, visualize=False)
+        pcd = pc_generator.get_pointcloud(color_image, color_frame, depth_frame, visualize=True)
 
         print(f"num points in point cloud: {np.asarray(pcd.points).shape}")
 
-        pc_generator.save(pcd, save_dir="./data/point_clouds", filename=f"{serial[-3:]}.pcd")
+        # pc_generator.save(pcd, save_dir="./data/point_clouds", filename=f"{serial[-3:]}.pcd")
 
         # --- 2. Color them differently (IMPORTANT!) ---
 
         T_color_from_left_ir = camera.get_extrinsics_left_ir_to_color()
 
-        pcd2 = load_ply("./main_regular/cloud.ply", visualize=False)
+        pcd2 = load_ply("./main_regular/cloud_denoise.ply", visualize=True)
         # pcd2.paint_uniform_color([0, 0, 1.0])  # Color pcd2 Blue
         # pcd2.scale(0.7, center=pcd2.get_center())
         
