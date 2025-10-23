@@ -10,8 +10,8 @@ from realsense_toolbox import RealSenseCamera
 def main():
 
     # # ===== YOUR CHANGES =====
-    serial = "244622072715"  # side
-    # serial = "346522075401"  # main
+    # serial = "244622072715"  # side
+    serial = "346522075401"  # main
 
 
     # see readme for full configurations.
@@ -35,11 +35,11 @@ def main():
                 break
 
         left, right = camera.get_ir_images()
-        left = cv2.cvtColor(left, cv2.COLOR_GRAY2BGR)
-        right = cv2.cvtColor(right, cv2.COLOR_GRAY2BGR)
+        left = cv2.cvtColor(left, cv2.COLOR_GRAY2RGB)
+        right = cv2.cvtColor(right, cv2.COLOR_GRAY2RGB)
 
-        cv2.imwrite("ir_left_side.png", left)
-        cv2.imwrite("ir_right_side.png", right)
+        cv2.imwrite("ir_left_main.png", left)
+        cv2.imwrite("ir_right_main.png", right)
 
         baseline = camera.get_baseline()
         intrinsic = camera.get_intrinsics()

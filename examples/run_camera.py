@@ -19,6 +19,9 @@ def main():
         "color_auto_exposure": False,
         "depth_auto_exposure": False,
         },
+        "viewer": {
+            "show_depth": True
+        }
     }
     # ========================
 

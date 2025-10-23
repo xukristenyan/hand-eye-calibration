@@ -31,13 +31,13 @@ def main():
 
 
     pcd_config = {  # main
-        "enable_depth_filter": True,
+        "enable_depth_filter": False,
         "min_depth": 0.1,
         "max_depth": 2.3,
-        "enable_prune": True,
+        "enable_prune": False,
         "bbox_min": [-0.7, -0.4, 0.01],     # x, y, z min ranges
         "bbox_max": [0.5, 0.5, 1.8],        # x, y, z max ranges
-        "enable_downsample": True,
+        "enable_downsample": False,
         "voxel_size": 0.01                  # unit: meter
     }
 
@@ -56,7 +56,7 @@ def main():
             if color_image is not None and depth_image is not None:
                 break
 
-        pcd = pc_generator.get_pointcloud(color_image, color_frame, depth_frame, visualize=True)
+        pcd = pc_generator.get_pointcloud(color_image, color_frame, depth_frame, visualize=False)
 
         print(f"num points in point cloud: {np.asarray(pcd.points).shape}")
 
@@ -66,16 +66,18 @@ def main():
 
         T_color_from_left_ir = camera.get_extrinsics_left_ir_to_color()
 
-        pcd2 = load_ply("/home/necl/Projects/FoundationStereo/test_outputs/cloud_denoise.ply", visualize=True)
-        pcd2.paint_uniform_color([0, 0, 1.0])  # Color pcd2 Blue
+        pcd2 = load_ply("./main_regular/cloud.ply", visualize=False)
+        # pcd2.paint_uniform_color([0, 0, 1.0])  # Color pcd2 Blue
+        # pcd2.scale(0.7, center=pcd2.get_center())
+        
         o3d.visualization.draw_geometries([pcd, pcd2])
         print(T_color_from_left_ir)
 
-        T_fake = np.identity(4)
-        T_fake[0, 3] = 0.5  # Add 0.5 to the x-translation
+        # T_fake = np.identity(4)
+        # T_fake[0, 3] = 0.5  # Add 0.5 to the x-translation
 
-        # pcd3 = pcd2.transform(T_color_from_left_ir)
-        pcd3 = pcd2.transform(T_fake)
+        pcd3 = pcd2.transform(T_color_from_left_ir)
+        # pcd3 = pcd2.transform(T_fake)
 
         # --- 3. Visualize them ---
 
