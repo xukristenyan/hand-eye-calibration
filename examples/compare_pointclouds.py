@@ -60,7 +60,7 @@ def main():
 
         print(f"num points in point cloud: {np.asarray(pcd.points).shape}")
 
-        # pc_generator.save(pcd, save_dir="./data/point_clouds", filename=f"{serial[-3:]}.pcd")
+        pc_generator.save(pcd, save_dir="./data/point_clouds", filename=f"{serial[-3:]}.pcd")
 
         # --- 2. Color them differently (IMPORTANT!) ---
 
