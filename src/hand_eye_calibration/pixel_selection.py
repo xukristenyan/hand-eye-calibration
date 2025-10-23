@@ -1,5 +1,5 @@
 import cv2
-from .utils import quit_keypress
+from .utils.control import quit_keypress
 
 
 class PixelSelector:

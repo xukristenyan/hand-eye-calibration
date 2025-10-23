@@ -23,6 +23,7 @@ dependencies = [
 kortex-api = { git = "https://github.com/kaolab-research/patched-kinova-kortex-api.git" }
 realsense-toolbox = { path = "../realsense-toolbox", editable = true }
 roboenv = { path = "../robo-env", editable = true }
+hand-eye-calibration = { workspace = true }
 
 [project.scripts]
 hand-eye-calibration = "hand_eye_calibration:main"
@@ -30,3 +31,11 @@ hand-eye-calibration = "hand_eye_calibration:main"
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "hand-eye-calibration",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

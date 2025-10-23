@@ -408,8 +408,8 @@ class Kinova(Robot):
         finger = gripper_command.gripper.finger.add()
 
         gripper_command.mode = Base_pb2.GRIPPER_POSITION
-        finger.finger_identifier = 1
-        finger.value = 0.0
+        # finger.finger_identifier = 1
+        # finger.value = 0.0
 
         e = threading.Event()
         notification_handle = self.base.OnNotificationActionTopic(
@@ -535,7 +535,7 @@ class Kinova(Robot):
 
         finished = e.wait(20)
         if finished:
-            print(f"[{action_name}] completed at {arm}")
+            # print(f"[{action_name}] completed at {arm}")
             print("movement complete!")
         else:
             print(f"[{action_name}] timed out.")

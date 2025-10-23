@@ -6,13 +6,13 @@ from hand_eye_calibration.utils.io import load_pcd, load_npy
 
 
 def main():
-    pcd_main = load_pcd("data/401.pcd", visualize=False)
-    pcd_side = load_pcd("data/715.pcd", visualize=False)
+    pcd_main = load_pcd("data/point_clouds/401.pcd", visualize=True)
+    pcd_side = load_pcd("data/point_clouds/715.pcd", visualize=True)
 
-    T_base_main = load_npy("data/T_base_main.npy")
-    T_base_side = load_npy("data/T_base_side.npy")
+    T_base_main = load_npy("data/Ts/T_346522075401.npy")
+    T_base_side = load_npy("data/Ts/T_244622072715.npy")
 
-    offset_file = None      # "data/manual_offset.npy"
+    offset_file = "data/Ts/manual_offset.npy"      # "data/manual_offset.npy"
     initial_offset = load_npy(offset_file) if offset_file and os.path.exists(offset_file) else None
 
     merger = PointCloudMerger(pcd_main, pcd_side, T_base_main, T_base_side, initial_offset)

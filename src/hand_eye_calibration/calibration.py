@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 import numpy as np
 from pathlib import Path
-from .utils import generate_random_poses, detect_marker_in_image, get_marker_detector, estimate_marker_pose, euler_to_rot
+from .utils.calibration import generate_random_poses, detect_marker_in_image, get_marker_detector, estimate_marker_pose, euler_to_rot
 from itertools import combinations
 from tabulate import tabulate
 from .pixel_selection import PixelSelector

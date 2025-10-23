@@ -18,9 +18,9 @@ class WaypointGenerator:
     def get_waypoint(self, p_cam):
         p_homo = np.hstack([p_cam, np.ones(1)])
         p_base = self.bTc @ p_homo
-        # target = [p_base[0], p_base[1], 0.15]
-        # waypoint = Waypoint(data = target)
-        waypoint = Waypoint(data = p_base[:3])
+        target = [p_base[0], p_base[1], 0.10]
+        waypoint = Waypoint(data = target)
+        # waypoint = Waypoint(data = p_base[:3])
         return waypoint
 
 @dataclass
@@ -69,7 +69,7 @@ def tune_transform(transform, x=None, y=None, z=None):   # x, y, z are offsets i
 def main():
     # ===== YOUR CHANGES =====
     serial = "346522075401"
-    # serial = "234222302792"
+    # serial = "244622072715"
 
     # /home/necl/Projects/hand-eye-calibration/data/20251020_114301/T_346522075401.npy     # rotated, 90
     # /home/necl/Projects/hand-eye-calibration/data/relatively_good/T_346522075401.npy
@@ -77,9 +77,10 @@ def main():
     # /home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy     # no filter, 150 trials (really bad lol)
     # /home/necl/Projects/hand-eye-calibration/data/transform_tests/T_346522075401.npy
 
-    file_name = ""
+    file_name = "/home/necl/Projects/hand-eye-calibration/data/good_401/T_346522075401.npy"
+    file_name = "/home/necl/Projects/hand-eye-calibration/data/Ts/T_346522075401.npy"
     transform = load_npy(file_name)
-    transform = tune_transform(transform, x=None, y=0.025, z=None)
+    transform = tune_transform(transform)
 
     # ========================
 
@@ -110,7 +111,7 @@ def main():
 
         pixels = pixel_selector.run(color_image)
         waypoint = convert_a_pixel_to_waypoint(camera, depth_frame, pixels[0], wp_generator)
-
+        print(waypoint)
         robot.go_to_waypoint(waypoint)
 
         # save updated transform

@@ -6,8 +6,9 @@ import traceback
 
 def main():
     # ===== YOUR CHANGES =====
-    serial = "346522075401"
-    # 234222302792
+    serial = "244622072715"
+    # 244622072715
+    # 346522075401
 
     # see readme for full configurations.
     specs = {
@@ -29,7 +30,7 @@ def main():
 
         calibrator = HandEyeCalibrator(camera, robot, data_dir='./data', save_images=True)
 
-        T_base_cam = calibrator.calibrate(marker_length=0.07, num_samples=5, filter=False)
+        T_base_cam = calibrator.calibrate(marker_length=0.07, num_samples=15, filter=True)
 
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Exiting gracefully.")
