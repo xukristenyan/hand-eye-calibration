@@ -8,7 +8,7 @@ def generate_random_poses(start_pose, num_samples=15):
     reference_pos, reference_euler = start_pose[:3], start_pose[3:]
 
     np.random.seed(42)
-    position_offsets = np.random.uniform(low=-0.05, high=0.05, size=(num_samples, 3))
+    position_offsets = np.random.uniform(low=-0.25, high=0.25, size=(num_samples, 3))
     euler_offsets = np.random.uniform(low=-0.1, high=0.1, size=(num_samples, 3))
 
     poses = []

@@ -1,15 +1,12 @@
 from hand_eye_calibration.pixel_selection import PixelSelector
-from realsense_toolbox import RealSenseCamera
-from realsense_toolbox import PointCloudGenerator
 from hand_eye_calibration.robot import Kinova
 import traceback
 import numpy as np
 from dataclasses import dataclass
-import numpy as np
-from typing_extensions import override
 from numpy.typing import NDArray
 import torch
 from hand_eye_calibration.utils.io import load_npy
+from zed_toolbox import ZedCamera
 
 class WaypointGenerator:
     def __init__(self, T):
@@ -49,9 +46,11 @@ class Waypoint():
         return f"Waypoint({self.data[0]:.2f}, {self.data[1]:.2f}, {self.data[2]:.2f})"
 
 
-def convert_a_pixel_to_waypoint(camera, depth_frame, pixel, wp_generator):
-    pixel_3d = camera.deproject_pixel_to_point(pixel, depth_frame)
+def convert_a_pixel_to_waypoint(camera, pixel, wp_generator):
+    pixel_3d = camera.deproject_to_3d(pixel)
+    print(f"point in camera: {pixel_3d}")
     waypoint = wp_generator.get_waypoint(pixel_3d)
+    print(f"point in robot: {waypoint}")
 
     return waypoint
 
@@ -77,23 +76,29 @@ def main():
     # /home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy     # no filter, 150 trials (really bad lol)
     # /home/necl/Projects/hand-eye-calibration/data/transform_tests/T_346522075401.npy
 
-    file_name = "/home/necl/Projects/hand-eye-calibration/data/good_401/T_346522075401.npy"
-    file_name = "/home/necl/Projects/hand-eye-calibration/data/Ts/T_346522075401.npy"
+    # file_name = "/home/necl/Projects/hand-eye-calibration/data/good_401/T_346522075401.npy"
+    file_name = "/home/necl/Projects/hand-eye-calibration/data/20251029_114835/T_24944966.npy"
+    # file_name = "/home/necl/Projects/hand-eye-calibration/data/Ts/T_346522075401.npy"
     transform = load_npy(file_name)
     transform = tune_transform(transform)
 
     # ========================
-
+    # ===== YOUR CHANGES =====
+    serial = 24944966
 
     # see readme for full configurations.
-    specs = {
-            "fps": 30,
-            "color_auto_exposure": False,
-            "depth_auto_exposure": False,
-        }
+    specs = {"fps": 30}
+    # ========================
+
+    # see readme for full configurations.
+    # specs = {
+    #         "fps": 30,
+    #         "color_auto_exposure": False,
+    #         "depth_auto_exposure": False,
+    #     }
     camera = None
     try:
-        camera = RealSenseCamera(serial, specs)
+        camera = ZedCamera(serial, specs)
         camera.launch()
 
         robot = Kinova(10, 1)
@@ -107,11 +112,10 @@ def main():
 
         wp_generator = WaypointGenerator(transform)
 
-        color_image, _, _, depth_frame = camera.get_current_state()
+        color_image, _ = camera.get_rgbd()
 
         pixels = pixel_selector.run(color_image)
-        waypoint = convert_a_pixel_to_waypoint(camera, depth_frame, pixels[0], wp_generator)
-        print(waypoint)
+        waypoint = convert_a_pixel_to_waypoint(camera, pixels[0], wp_generator)
         robot.go_to_waypoint(waypoint)
 
         # save updated transform

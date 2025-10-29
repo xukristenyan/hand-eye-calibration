@@ -7,7 +7,7 @@ class PixelSelector:
         self.win = win
         self.clicks = []
 
-    def load_image(self, img, recrop=False, x=700, y=300, width=400, height=300, out_size=(640, 480)):
+    def load_image(self, img, recrop=False, x=700, y=300, width=400, height=300, out_size=(1280, 720)):
         if recrop:
             img = img[y:y+height, x:x+width]
         if out_size:

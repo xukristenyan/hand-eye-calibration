@@ -47,14 +47,24 @@ class HandEyeCalibrator:
         return pose.data
 
 
-    def get_camera_image(self):
-        color_image, _ = self.camera.get_images()
+    # def get_camera_image(self):         # realsense
+    #     color_image, _ = self.camera.get_images()
+    #     return color_image
+
+
+    # def get_camera_intrinsics(self):         # realsense
+    #     intrinsics = self.camera.intrinsics
+    #     return intrinsics["matrix"], intrinsics["coeffs"]
+
+
+    def get_camera_image(self):         # zed
+        color_image, _ = self.camera.get_rgbd()
         return color_image
 
 
-    def get_camera_intrinsics(self):
-        intrinsics = self.camera.intrinsics
-        return intrinsics["matrix"], intrinsics["coeffs"]
+    def get_camera_intrinsics(self):         # zed
+        K, dist = self.camera.get_intrinsics()
+        return K, dist
 
     # def get_T_marker_gripper(self):
     #     # define the fixed transform from marker to gripper
@@ -113,7 +123,7 @@ class HandEyeCalibrator:
         print(tabulate(table_data, headers, tablefmt="fancy_grid"))
         print("Unit: cm")
 
-        np.save(self.save_dir / f"T_{self.camera.serial}.npy", T_base_cam)
+        np.save(self.save_dir / f"T_{str(self.camera.serial)}.npy", T_base_cam)
 
         return T_base_cam
 
