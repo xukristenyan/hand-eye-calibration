@@ -10,8 +10,8 @@ camera_config = {
 
     "specifications": {
         "fps": 30,
-    "color_auto_exposure": False,
-    "depth_auto_exposure": False,
+        "color_auto_exposure": False,
+        "depth_auto_exposure": False,
     },
 
     "viewer": {                     # no need to keep this dict if "enable_viewer" is False

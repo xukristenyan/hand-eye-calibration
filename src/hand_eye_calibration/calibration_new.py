@@ -3,11 +3,10 @@ import random
 from pathlib import Path
 from datetime import datetime
 
-
 from hand_eye_calibration.calibration import HandEyeCalibrator
-from realsense_toolbox.camera import Camera
 from hand_eye_calibration.config import serial, camera_config
 from hand_eye_calibration.robot import Kinova
+from realsense_toolbox import RealSenseCamera
 
 MIN_X = 0
 MIN_Y = 0
@@ -86,5 +85,12 @@ class HandEyeCalibratorNew():
         pass
 
 if __name__ == "__main__":
-    a = HandEyeCalibratorNew()
+    specs = camera_config.get("specifications")
+
+    camera = RealSenseCamera(serial, specs)
+    camera.launch()
+
+    robot = Kinova(10, 1)
+    robot.launch()
+    a = HandEyeCalibratorNew(camera, robot, 7)
     print(a.get_current_robot_pose())

@@ -1,7 +1,7 @@
 import time
 import numpy as np
 
-from realsense_toolbox.camera import Camera
+from realsense_toolbox import Camera
 from hand_eye_calibration.config import serial, camera_config
 from hand_eye_calibration.utils import get_marker_detector, detect_marker_in_image, estimate_marker_pose
 
