@@ -78,13 +78,14 @@ def main():
 
     # file_name = "/home/necl/Projects/hand-eye-calibration/data/good_401/T_346522075401.npy"
     file_name = "/home/necl/Projects/hand-eye-calibration/data/20251029_114835/T_24944966.npy"
-    # file_name = "/home/necl/Projects/hand-eye-calibration/data/Ts/T_346522075401.npy"
+    file_name = "/home/necl/Projects/hand-eye-calibration/data/20251105_124242/T_33261276.npy"
     transform = load_npy(file_name)
-    transform = tune_transform(transform)
+    transform = tune_transform(transform, y=-0.06)
 
     # ========================
     # ===== YOUR CHANGES =====
     serial = 24944966
+    serial = 33261276
 
     # see readme for full configurations.
     specs = {"fps": 30}

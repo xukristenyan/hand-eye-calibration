@@ -8,6 +8,7 @@ def main():
 
     # ===== YOUR CHANGES =====
     serial = 24944966
+    serial = 33261276
 
     # see readme for full configurations.
     camera_config = {
