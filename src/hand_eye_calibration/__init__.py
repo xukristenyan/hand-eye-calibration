@@ -1,2 +1,1 @@
-from .calibration import HandEyeCalibrator
-from .pointcloud_merging import PointCloudMerger
+from .eye_to_hand_calibration import HandEyeCalibrator
