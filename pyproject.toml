@@ -16,13 +16,14 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "roboenv",
     "kortex-api",
-    "zed-toolbox"
+    "zed-toolbox",
+    "realsense-toolbox"
 ]
 
 [tool.uv.sources]
 kortex-api = { git = "https://github.com/kaolab-research/patched-kinova-kortex-api.git" }
 roboenv = { path = "../robo-env", editable = true }
-zed-toolbox = { path = "../zed-toolbox", editable = true }
+realsense-toolbox = { path = "../realsense-toolbox", editable = true }
 
 [project.scripts]
 hand-eye-calibration = "hand_eye_calibration:main"
