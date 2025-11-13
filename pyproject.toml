@@ -14,7 +14,15 @@ dependencies = [
     "open3d",
     "torchvision>=0.24.0",
     "opencv-python>=4.11.0.86",
+    "roboenv",
+    "kortex-api",
+    "zed-toolbox"
 ]
+
+[tool.uv.sources]
+kortex-api = { git = "https://github.com/kaolab-research/patched-kinova-kortex-api.git" }
+roboenv = { path = "../robo-env", editable = true }
+zed-toolbox = { path = "../zed-toolbox", editable = true }
 
 [project.scripts]
 hand-eye-calibration = "hand_eye_calibration:main"

@@ -1,19 +1,19 @@
 from hand_eye_calibration import HandEyeCalibrator
-from hand_eye_calibration.your_camera import YourCam
-from hand_eye_calibration.your_robot import YourRobot
+from hand_eye_calibration.camera_zed import Zed
+from hand_eye_calibration.robot_kinova import KinovaRobot
 import traceback
 
 
 def main():
     # ===== YOUR CHANGES =====
-    serial = "YOUR SERIAL"
+    serial = 24944966
     specs = {
         "fps": 30,
         "auto_exposure": False
         }
-    camera = YourCam(serial, specs)
+    camera = Zed(serial, specs)
 
-    robot = YourRobot(10, 1)
+    robot = KinovaRobot(10, 1)
 
     # TODO: pass in the offsets between the marker and the robot if there's any
     # first three are translation offsets in meter (Measured from marker center to gripper TCP): 
@@ -23,7 +23,7 @@ def main():
     # last three are rotation offsets in degree:
     #   physical rotation (whatever you determine is correct for your setup)
     # default would be all zero
-    offsets = [0.0, 0.01, 0.02, 90.0, 0.0, 0.0]
+    offsets = [0.0, 0.16, 0.02, 90.0, 0.0, 0.0]
 
     # TODO: the length of your marker attached on the gripper in meter
     marker_length = 0.07
@@ -37,7 +37,7 @@ def main():
         robot.launch()
 
         calibrator = HandEyeCalibrator(camera, robot,  offsets=offsets, data_dir='./data', save_images=True)
-        T_base_cam = calibrator.calibrate(marker_length=marker_length, num_samples=num_samples, filter=True)    # set filter to False if num_samples is large (>30)
+        T_base_cam = calibrator.calibrate(marker_length=marker_length, num_samples=num_samples, move_range=0.25, filter=True)    # set filter to False if num_samples is large (>30)
 
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Exiting gracefully.")
