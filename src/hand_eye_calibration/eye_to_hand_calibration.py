@@ -11,38 +11,47 @@ from tabulate import tabulate
 
 class HandEyeCalibrator:
 
-    def __init__(self, camera, robot, offsets=None, data_dir='./data', save_images=True):
+    def __init__(self, camera, robot, offsets=None, data_dir='./data'):
         self.camera = camera
         self.robot = robot
 
+        os.makedirs(data_dir, exist_ok=True)
         self.save_dir = Path(data_dir) / datetime.now().strftime("%Y%m%d_%H%M%S")
         os.makedirs(self.save_dir, exist_ok=True)
 
-        self.image_dir = None
-        if save_images:
-            self.image_dir = self.save_dir / "images"
-            os.makedirs(self.image_dir, exist_ok=True)
+        self.image_dir = self.save_dir / "images"
+        os.makedirs(self.image_dir, exist_ok=True)
 
-        self.T_marker_gripper = self.get_T_marker_gripper(offsets)
+        self.T_marker_gripper = self._get_T_marker_gripper(offsets)
+
+    def move_robot_to_pose(self, pose):
+
+        finished = self.robot.reach_pose(pose, "go_to_pose")
+
+        return finished
 
 
-    def get_T_marker_gripper(self, offsets):
+    def get_current_robot_pose(self):
+
+        pose = self.robot.get_current_state()
+
+        return pose.data
+
+    def _get_T_marker_gripper(self, offsets):
         T_marker_gripper = np.eye(4)
         
         if offsets is not None:
             x, y, z, roll, pitch, yaw = offsets
             rotation = euler_to_rot(np.deg2rad(roll), np.deg2rad(pitch), np.deg2rad(yaw))
             translation = np.array([x, y, z])
-
+            print(translation, rotation)
             T_marker_gripper[:3, :3] = rotation
             T_marker_gripper[:3, 3] = translation
         
         return T_marker_gripper
 
-
+        
     def calibrate(self, marker_length=0.07, num_samples=15, move_range=0.25, filter=True):
-        self.T_marker_gripper = self.get_T_marker_gripper()
-
         robot_poses, marker_poses = self.collect_marker_and_robot_poses(marker_length, num_samples, move_range)
         T_base_cam = self.get_rigid_transform(marker_poses, robot_poses, self.T_marker_gripper)
         mean_error, std_error = self.validate_calibration(T_base_cam, marker_poses, robot_poses, self.T_marker_gripper)
@@ -59,6 +68,11 @@ class HandEyeCalibrator:
                 T_base_cam = best_T_base_cam
 
             table_data.append([f"{best_mean_error * 100:.2f}", f"{best_std_error * 100:.2f}", ', '.join([str(idx) for idx in best_samples_indices])])
+
+            # save best poses
+            with open(str(self.save_dir / "best_poses.txt"), "w") as f:
+                for i in best_samples_indices:
+                    f.write(f"{i}\n")
 
         print(tabulate(table_data, headers, tablefmt="fancy_grid"))
         print("Unit: cm")
@@ -135,20 +149,23 @@ class HandEyeCalibrator:
 
 
     def collect_marker_and_robot_poses(self, marker_length, num_samples=15, move_range=0.25):
-        start_pose = self.robot.get_current_robot_pose()
+        # start_pose = self.robot.get_current_robot_pose()
+        start_pose = self.get_current_robot_pose()
         target_poses = generate_random_poses(start_pose, num_samples, move_range)
 
         detector = get_marker_detector()
         intrin_matrix, dist_coeffs = self.camera.get_camera_intrinsics()
 
+        raw_robot_poses = []
         robot_poses = []
         marker_poses = []
 
         for i, target_pose in enumerate(target_poses):
             print(f"[{i+1}/{num_samples}] Moving to target pose: {target_pose}")
 
-            finished = self.robot.move_robot_to_pose(target_pose)
-            
+            # finished = self.robot.move_robot_to_pose(target_pose)
+            finished = self.move_robot_to_pose(target_pose)
+
             if finished:
                 time.sleep(3)
 
@@ -165,18 +182,23 @@ class HandEyeCalibrator:
             T_marker_cam = self.get_T_marker_camera(rvec, tvec)
 
             # get robot pose
-            cur_pose = self.robot.get_current_robot_pose()
+            # cur_pose = self.robot.get_current_robot_pose()
+            cur_pose = self.get_current_robot_pose()
             robot_pose_rad = np.deg2rad(cur_pose[3:])
             robot_pose = np.concatenate((cur_pose[:3], robot_pose_rad))
             T_ee_robot = self.get_T_ee_robot(robot_pose)
 
             # record pose
+            raw_robot_poses.append(cur_pose)
             robot_poses.append(T_ee_robot)
             marker_poses.append(T_marker_cam)
 
-            # save image
-            if self.image_dir is not None:
-                cv2.imwrite(f"{self.image_dir}/image_{i}.png", image)
+            # save results
+            cv2.imwrite(f"{self.image_dir}/image_{i}.png", image)
+
+        # save raw robot poses to construct golden pool later
+        raw_poses = np.array(raw_robot_poses)
+        np.save(self.save_dir / "robot_poses.npy", raw_poses)
 
         return robot_poses, marker_poses
 
@@ -219,7 +241,7 @@ class HandEyeCalibrator:
 
         # 6. Handle reflection case (if determinant is -1)
         if np.linalg.det(R) < 0:
-            print("Warning: Reflection detected. Fixing determinant.")
+            # print("Warning: Reflection detected. Fixing determinant.")
             Vt[2, :] *= -1
             R = Vt.T @ U.T
 

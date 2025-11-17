@@ -47,7 +47,7 @@ class Kinova(Robot):
         self.id= id
         self.ip = "192.168.1.10"
         self.state = None
-        self.bounds: list[tuple[float, float]] = [(0.15, 0.75), (-0.60, 0.42), (0.02, 0.40)]
+        self.bounds: list[tuple[float, float]] = [(0.15, 0.75), (-0.60, 0.42), (-0.08, 0.40)]
         """operating area bounds in (x,y,z)"""
         self.height: float = 0.30
         """default navigation height (m)"""
@@ -401,7 +401,7 @@ class Kinova(Robot):
         action_list = self.base.ReadAllActions(action_type)
         action_handle = None
         for action in action_list.action_list:
-            if action.name == "home_sept":
+            if action.name == "HOME":
                 action_handle = action.handle
         
         gripper_command = Base_pb2.GripperCommand()

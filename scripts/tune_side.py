@@ -1,12 +1,13 @@
 from hand_eye_calibration.pixel_selection import PixelSelector
 from hand_eye_calibration.robot import Kinova
+from hand_eye_calibration.camera_zed import Zed
+from hand_eye_calibration.utils.io import load_npy
+
 import traceback
 import numpy as np
 from dataclasses import dataclass
 from numpy.typing import NDArray
 import torch
-from hand_eye_calibration.utils.io import load_npy
-from zed_toolbox import ZedCamera
 
 class WaypointGenerator:
     def __init__(self, T):
@@ -15,9 +16,13 @@ class WaypointGenerator:
     def get_waypoint(self, p_cam):
         p_homo = np.hstack([p_cam, np.ones(1)])
         p_base = self.bTc @ p_homo
-        target = [p_base[0], p_base[1], 0.10]
-        waypoint = Waypoint(data = target)
-        # waypoint = Waypoint(data = p_base[:3])
+        
+        # option1: specified height
+        # target = [p_base[0], p_base[1], 0.10]
+        # waypoint = Waypoint(data = target)
+
+        # option2: transformed height
+        waypoint = Waypoint(data = p_base[:3])
         return waypoint
 
 @dataclass
@@ -27,7 +32,6 @@ class Waypoint():
     """
 
     data: NDArray[np.float32]  # [px, py, pz] in robot coordinates
-
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __post_init__(self) -> None:
@@ -47,7 +51,7 @@ class Waypoint():
 
 
 def convert_a_pixel_to_waypoint(camera, pixel, wp_generator):
-    pixel_3d = camera.deproject_to_3d(pixel)
+    pixel_3d = camera.deproject_pixel_to_point(pixel)
     print(f"point in camera: {pixel_3d}")
     waypoint = wp_generator.get_waypoint(pixel_3d)
     print(f"point in robot: {waypoint}")
@@ -67,53 +71,33 @@ def tune_transform(transform, x=None, y=None, z=None):   # x, y, z are offsets i
 
 def main():
     # ===== YOUR CHANGES =====
-    serial = "346522075401"
-    # serial = "244622072715"
+    file_name = "/home/necl/Projects/hand-eye-calibration/data/20251113_160125/T_24944966.npy"
 
-    # /home/necl/Projects/hand-eye-calibration/data/20251020_114301/T_346522075401.npy     # rotated, 90
-    # /home/necl/Projects/hand-eye-calibration/data/relatively_good/T_346522075401.npy
-    # /home/necl/Projects/hand-eye-calibration/data/bTc.npy
-    # /home/necl/Projects/hand-eye-calibration/data/20251020_203203/T_346522075401.npy     # no filter, 150 trials (really bad lol)
-    # /home/necl/Projects/hand-eye-calibration/data/transform_tests/T_346522075401.npy
-
-    # file_name = "/home/necl/Projects/hand-eye-calibration/data/good_401/T_346522075401.npy"
-    file_name = "/home/necl/Projects/hand-eye-calibration/data/20251029_114835/T_24944966.npy"
-    file_name = "/home/necl/Projects/hand-eye-calibration/data/20251105_124242/T_33261276.npy"
-    transform = load_npy(file_name)
-    transform = tune_transform(transform, y=-0.06)
-
-    # ========================
-    # ===== YOUR CHANGES =====
-    serial = 24944966
     serial = 33261276
-
-    # see readme for full configurations.
-    specs = {"fps": 30}
+    specs = {
+        "fps": 30,
+        "auto_exposure": False,
+        "exposure": 25,
+        "gain": 45,
+        }
+    camera = Zed(serial, specs)
+    
+    robot = Kinova(10, 1)
     # ========================
 
-    # see readme for full configurations.
-    # specs = {
-    #         "fps": 30,
-    #         "color_auto_exposure": False,
-    #         "depth_auto_exposure": False,
-    #     }
-    camera = None
+    transform = load_npy(file_name)
+    transform = tune_transform(transform, x=None, y=None, z=None)
+
     try:
-        camera = ZedCamera(serial, specs)
         camera.launch()
-
-        robot = Kinova(10, 1)
         robot.launch()
-        if robot.connected:
-            print("Connection successful")
-
         robot.go_home()
 
         pixel_selector = PixelSelector()
 
         wp_generator = WaypointGenerator(transform)
 
-        color_image, _ = camera.get_rgbd()
+        color_image = camera.get_camera_image()
 
         pixels = pixel_selector.run(color_image)
         waypoint = convert_a_pixel_to_waypoint(camera, pixels[0], wp_generator)
@@ -135,8 +119,9 @@ def main():
         traceback.print_exc()
     
     finally:
-        if camera:
-            camera.shutdown()
+        camera.shutdown()
+        robot.shutdown()
+
 
 
 if __name__ == "__main__":

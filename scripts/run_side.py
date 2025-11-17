@@ -7,16 +7,17 @@ from zed_toolbox import Camera
 def main():
 
     # ===== YOUR CHANGES =====
-    serial = 24944966
     serial = 33261276
 
-    # see readme for full configurations.
     camera_config = {
         "enable_viewer": True,
         "enable_recorder": False,
 
         "specifications": {
             "fps": 30,
+            "auto_exposure": False,
+            "exposure": 25,
+            "gain": 45,
         },
     }
     # ========================
@@ -28,22 +29,6 @@ def main():
         camera.launch()
 
         while True:
-
-            # # ===== YOUR CHANGES =====
-            # # mimic overlays to be added
-            # moving_x = int(100 + 50 * (1 + time.time() % 4))
-            
-            # # see readme for full configurations.
-            # overlays = [
-            #     {
-            #         "type": "dot",
-            #         "xy": (moving_x, 200),
-            #         # "radius": 8,
-            #         # "color": (0, 255, 0) # Green
-            #     }
-            # ]
-            # # ========================
-
             camera.update()
 
             if not camera.is_alive:

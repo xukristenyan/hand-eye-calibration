@@ -9,11 +9,14 @@ def generate_random_poses(start_pose, num_samples=15, move_range=0.20):
 
     np.random.seed(42)
     position_offsets = np.random.uniform(low=-move_range, high=move_range, size=(num_samples, 3))
-    euler_offsets = np.random.uniform(low=-0.1, high=0.1, size=(num_samples, 3))
+    euler_offsets = np.random.uniform(low=-0.3, high=0.3, size=(num_samples, 3))
 
     poses = []
     for i in range(num_samples):
         target_pos = reference_pos + position_offsets[i]
+        # clip z 
+        target_pos[2] = 0.02 if target_pos[2] < 0.02 else target_pos[2]
+
         target_euler = reference_euler + euler_offsets[i]
 
         poses.append(np.concatenate((target_pos, target_euler)))
